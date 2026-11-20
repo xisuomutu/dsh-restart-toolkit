@@ -16,7 +16,7 @@
 从 GitHub Releases 下载最新工具包与校验文件（把 `<owner>/<repo>` 换成实际仓库地址）：
 
 ```text
-https://github.com/<owner>/<repo>/releases
+https://github.com/xisuomutu/dsh-restart-toolkit/releases
 ```
 
 附件：
