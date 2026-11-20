@@ -3,19 +3,6 @@
 本文件记录 DSH Restart Toolkit 的所有重要变更。格式基于
 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 SemVer。
 
-## [Unreleased]
-
-### Changed
-
-- 文档统一为生产级结构：架构、生命周期、测试计划、发布说明；历史事件不再保留独立记录文档。
-- 新增文档索引与文档约定。
-
-### Removed
-
-- 删除 `RELEASE.md`：发布流程已由 README、INSTALL、CHANGELOG 覆盖。
-- 删除 `docs/04-field-notes.md` 与 `docs/04-troubleshooting.md`：故障排查入口合并到
-  INSTALL 与测试计划。
-
 ## [1.0.0] - 2026-11-20
 
 首个公开版本，适用于 DSH Desktop 0.2.2-rc.5（Windows）。
@@ -36,6 +23,14 @@
 ### Changed
 
 - 托盘文案从“重启 DSH”改为“重启 DeepSeek Harness”。
+- 文档统一为生产级结构：架构、生命周期、测试计划、发布说明；历史事件不再保留独立记录文档。
+- 新增文档索引与文档约定。
+
+### Removed
+
+- 删除 `RELEASE.md`：发布流程已由 README、INSTALL、CHANGELOG 覆盖。
+- 删除 `docs/04-field-notes.md` 与 `docs/04-troubleshooting.md`：故障排查入口合并到
+  INSTALL 与测试计划。
 
 ### Fixed
 
@@ -60,4 +55,3 @@
 - 实机验证：v2 启动重试捕获 `ECONNRESET` 后恢复；无新增 crash report；Host `close code=0`。
 
 [1.0.0]: https://github.com/xisuomutu/dsh-restart-toolkit/releases/tag/v1.0.0
-[Unreleased]: https://github.com/xisuomutu/dsh-restart-toolkit/compare/v1.0.0...HEAD
