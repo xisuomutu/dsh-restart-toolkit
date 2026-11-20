@@ -1,22 +1,44 @@
-# Disclaimer
+# 免责声明与使用限制
 
-This is an **unofficial** desktop-shell patch toolkit for DeepSeek Harness
-Desktop on Windows.
+> 文档状态：已发布  
+> 适用范围：DSH Restart Toolkit 1.0.0（Windows，DSH Desktop 0.2.2-rc.5）
 
-- It modifies `resources/app.asar` of the installed application. This is not
-  an officially supported extension point.
-- The patch is written against **DSH Desktop 0.2.2-rc.5**. Other versions or
-  builds may fail the anchor check and must not be forced.
-- Always keep the automatic `app.asar.bak-<timestamp>` backup. If the
-  application does not start, restore the backup before trying anything else.
-- Desktop updates overwrite `app.asar`; re-run the compatibility check and
-  patch after every update.
-- ASAR integrity validation, code signing, enterprise policy, antivirus, and
-  endpoint protection may block a modified archive. The toolkit reports the
-  relevant Electron fuses where possible, but cannot guarantee acceptance.
-- The restart sequence interrupts running turns, tools, terminals, and
-  background jobs. Session logs are durable, but in-flight work is not.
-- No warranty is provided. You are responsible for testing on your own
-  machine and for complying with the DeepSeek Harness license, third-party
-  licenses, and DeepSeek's terms of service.
-- This document is not legal advice.
+## 1. 非官方软件
+
+本工具包是**非官方**桌面壳补丁工具包，不隶属、背书或赞助于 DeepSeek。使用本工具包即表示
+你理解并接受以下限制。
+
+## 2. 修改范围
+
+- 工具包修改已安装应用的 `resources/app.asar`；这不是官方支持的扩展点。
+- 补丁只针对 **DSH Desktop 0.2.2-rc.5**。其他版本或构建可能无法通过锚点检查，
+  **不得强行应用**。
+- 工具包不修改认证协议、Host 启动参数、插件 Loader 或用户数据。
+
+## 3. 备份与回滚
+
+- 应用脚本会自动生成 `app.asar.bak-<timestamp>`；必须保留该备份。
+- 如果应用无法启动，先恢复备份，再尝试其他操作。
+- 桌面壳更新会覆盖 `app.asar`；每次更新后必须重新运行兼容性检查并重新打补丁。
+
+## 4. 完整性与签名
+
+- ASAR 完整性校验、Authenticode、企业策略、杀毒和终端防护可能阻止修改后的归档。
+- 工具包会在可能时报告相关 Electron fuse，但不能保证被接受。
+- `app.asar` 不是独立签名的；修改后官方签名不再覆盖该资源。
+
+## 5. 数据与任务
+
+- 重启会中断正在运行的轮次、工具、终端和后台任务。
+- 会话日志按事件持久化；进行中的工作不会保留。
+- 快照不包含环境变量；日志不记录 API key、token 或完整环境。
+
+## 6. 无担保
+
+本工具包按“现状”提供，不提供任何明示或默示担保。你需自行在自己的机器上测试，并承担使用
+风险。作者不对数据丢失、启动失败、合规问题或第三方索赔负责。
+
+## 7. 法律声明
+
+本文档不构成法律意见。对外分发、商业使用或品牌使用前，应自行确认 DeepSeek Harness 许可证、
+第三方许可证和 DeepSeek 服务条款，并咨询法律顾问。
