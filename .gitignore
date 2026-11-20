@@ -1,0 +1,14 @@
+# Release artifacts and local machine-specific files
+dist/
+*.zip
+*.log
+*.dmp
+
+# Never commit a DSH archive or backups
+app.asar
+app.asar.bak-*
+app.asar.unpacked/
+
+# Dependencies and profiles
+node_modules/
+.plugin-manager/

@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "重启 DeepSeek Harness（命令）",
+    "description": "注册 /restart-dsh 命令。与桌面托盘补丁共用同一条重启桥：DSH 完整退出后以当前的可执行文件和启动参数重新启动；未安装托盘补丁时命令会给出明确错误。",
+    "detail": "docs/DETAIL.md"
+  }
+}

@@ -1,0 +1,280 @@
+diff --git a/lib/main.js b/lib/main.js
+index b9975b2..e8de362 100644
+--- a/lib/main.js
++++ b/lib/main.js
+@@ -11684,6 +11684,7 @@ function isDesktopHostEvent(message) {
+ 			return Number.isSafeInteger(candidate.requestId) && (candidate.error === void 0 || typeof candidate.error === "string") && (resource === null || typeof resource === "object" && "path" in resource && typeof resource.path === "string" && "sha256" in resource && typeof resource.sha256 === "string" && /^[a-f0-9]{64}$/u.test(resource.sha256) && "size" in resource && typeof resource.size === "number" && Number.isSafeInteger(resource.size) && resource.size >= 0);
+ 		}
+ 		case "quit-inspection": return Number.isSafeInteger(candidate.requestId) && typeof candidate.activeTasks === "boolean" && typeof candidate.scheduledTasks === "boolean" && (candidate.error === void 0 || typeof candidate.error === "string");
++		case "restart-app": return Number.isSafeInteger(candidate.requestId);
+ 		default: return false;
+ 	}
+ }
+@@ -11736,6 +11737,7 @@ var DesktopHostProcess = class {
+ 	packageManager;
+ 	onPlatformSession;
+ 	onPluginOperation;
++	onRestartRequest;
+ 	runId;
+ 	child;
+ 	readyResolve;
+@@ -11762,8 +11764,9 @@ var DesktopHostProcess = class {
+ 	* @param packageManager - Bundled pnpm entry and Node launcher directory, scoped to package operations.
+ 	* @param onPlatformSession - Private credential updates for embedded Platform views.
+ 	* @param onPluginOperation - Optional diagnostic sink; malformed records are ignored without failing the Host.
++	* @param onRestartRequest - Called when the Host asks the shell to restart the application.
+ 	*/
+-	constructor(node, runtimeDir, projectDir, inspectPort, environment = process.env, onFailure, primaryRuntime, packageManager, onPlatformSession, onPluginOperation) {
++	constructor(node, runtimeDir, projectDir, inspectPort, environment = process.env, onFailure, primaryRuntime, packageManager, onPlatformSession, onPluginOperation, onRestartRequest) {
+ 		this.node = node;
+ 		this.runtimeDir = runtimeDir;
+ 		this.projectDir = projectDir;
+@@ -11774,6 +11777,7 @@ var DesktopHostProcess = class {
+ 		this.packageManager = packageManager;
+ 		this.onPlatformSession = onPlatformSession;
+ 		this.onPluginOperation = onPluginOperation;
++		this.onRestartRequest = onRestartRequest;
+ 	}
+ 	/**
+ 	* Start this child once and await its Web application URL.
+@@ -11804,6 +11808,11 @@ var DesktopHostProcess = class {
+ 		child.stderr?.setEncoding("utf8");
+ 		child.stderr?.on("data", (chunk) => {
+ 			this.stderr = (this.stderr + chunk).slice(-65536);
++			try {
++				const hostLogDir = join(app.getPath("userData"), "tray-restart");
++				mkdirSync(hostLogDir, { recursive: true });
++				appendFileSync(join(hostLogDir, "host-stderr.log"), chunk);
++			} catch {}
+ 		});
+ 		child.stdout?.pipe(process.stdout);
+ 		child.on("message", (message) => {
+@@ -11816,6 +11825,10 @@ var DesktopHostProcess = class {
+ 				}
+ 				return;
+ 			}
++			if (typeof message === "object" && message !== null && message.type === "restart-app" && Number.isSafeInteger(message.requestId)) {
++				this.onRestartRequest?.();
++				return;
++			}
+ 			if (!isDesktopHostEvent(message)) {
+ 				this.fail(/* @__PURE__ */ new Error("dsh desktop host sent an invalid IPC event"));
+ 				child.kill("SIGTERM");
+@@ -11841,6 +11854,11 @@ var DesktopHostProcess = class {
+ 		});
+ 		this.exitPromise = new Promise((resolve) => {
+ 			child.once("close", (code) => {
++				try {
++					const hostLogDir = join(app.getPath("userData"), "tray-restart");
++					mkdirSync(hostLogDir, { recursive: true });
++					appendFileSync(join(hostLogDir, "host-events.log"), `${new Date().toISOString()} host close code=${String(code)} stderrTail=${JSON.stringify(this.stderr.slice(-2000))}\n`);
++				} catch {}
+ 				const suffix = this.stderr.trim() === "" ? "" : `: ${this.stderr.trim()}`;
+ 				if (code !== 0 && code !== null) this.fail(/* @__PURE__ */ new Error(`dsh desktop host exited with ${String(code)}${suffix}`));
+ 				else this.fail(/* @__PURE__ */ new Error(`dsh desktop host stopped${suffix}`));
+@@ -19938,11 +19956,32 @@ var DesktopQuitConfirmation = class {
+ //#endregion
+ //#region lib/types/tray.js
+ /** Windows system tray: the always-present way back to a hidden window and the explicit quit entry. */
++/**
++ * Context menu for the Windows system tray. The shipped Open/Quit entries keep
++ * their exact labels, order, and actions; Restart is inserted between them so
++ * the Quit position never moves.
++ * @param {object} messages - Current desktop locale messages.
++ * @param {{ open: () => void, restart: () => void, quit: () => void }} actions
++ */
++function trayMenuTemplate(messages, actions) {
++	return [{
++		label: messages.openApplication,
++		click: () => actions.open()
++	}, {
++		id: "tray-restart",
++		// restartApplication is already localized by the shell ("Restart"/"重启").
++		label: `${messages.restartApplication} DeepSeek Harness`,
++		click: () => actions.restart()
++	}, { type: "separator" }, {
++		label: messages.quitApplication,
++		click: () => actions.quit()
++	}];
++}
+ /** Tray icon present for the whole run, not only while the window is hidden. */
+ var DesktopTray = class {
+ 	options;
+ 	tray;
+-	/** @param options - Icon path, locale reader, and the open and quit actions. */
++	/** @param options - Icon path, locale reader, and the open, restart, and quit actions. */
+ 	constructor(options) {
+ 		this.options = options;
+ 		const tray = new Tray(nativeImage.createFromPath(options.iconPath));
+@@ -19958,21 +19997,11 @@ var DesktopTray = class {
+ 		if (tray === void 0) return;
+ 		const { messages } = this.options.locale();
+ 		tray.setToolTip(messages.aboutProduct);
+-		tray.setContextMenu(Menu.buildFromTemplate([
+-			{
+-				label: messages.openApplication,
+-				click: () => {
+-					this.options.open();
+-				}
+-			},
+-			{ type: "separator" },
+-			{
+-				label: messages.quitApplication,
+-				click: () => {
+-					this.options.quit();
+-				}
+-			}
+-		]));
++		tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate(messages, {
++			open: () => this.options.open(),
++			restart: () => this.options.restart(),
++			quit: () => this.options.quit()
++		})));
+ 	}
+ 	/** Remove the icon; called once the quit is confirmed so no dead icon outlives the process. */
+ 	dispose() {
+@@ -20380,6 +20409,86 @@ async function main() {
+ 		hostEnvironment = await loginShell;
+ 	};
+ 	let quitting = false;
++	/**
++	 * Restart the whole desktop application. app.relaunch() preserves the current
++	 * executable and argv; quitWithoutConfirmation() runs the shell's existing
++	 * shutdown path (backend.close -> DesktopHostProcess.stop escalation) so the
++	 * Host and its children are torn down. A detached watchdog observes the
++	 * handoff and reports a start failure after the shell has exited.
++	 */
++	let trayRestartInFlight = false;
++	const restartFromTray = () => {
++		if (trayRestartInFlight || quitting || shuttingDown) return;
++		trayRestartInFlight = true;
++		let watchdogProcess;
++		const restartDir = join(app.getPath("userData"), "tray-restart");
++		const restartLog = join(restartDir, "restart.log");
++		const appendRestartLog = (line) => {
++			try {
++				mkdirSync(restartDir, { recursive: true });
++				appendFileSync(restartLog, `${new Date().toISOString()} [desktop-tray] ${line}\n`);
++			} catch (error) {
++				console.error("tray restart log:", error);
++			}
++			console.info("[desktop-tray]", line);
++		};
++		try {
++			mkdirSync(restartDir, { recursive: true });
++			const launchedAt = Date.now();
++			appendRestartLog(`restart requested (pid=${process.pid}, exe=${process.execPath}, args=${JSON.stringify(process.argv.slice(1))})`);
++			const watchdogPath = join(process.resourcesPath, "tray-restart-watchdog.cjs");
++			let configPath;
++			if (existsSync(watchdogPath)) {
++				configPath = join(restartDir, `restart-${launchedAt}.json`);
++				writeFileSync(configPath, `${JSON.stringify({
++					version: 1,
++					createdAt: launchedAt,
++					oldPid: process.pid,
++					cutoff: launchedAt,
++					executablePath: process.execPath,
++					args: process.argv.slice(1),
++					cwd: process.cwd(),
++					logPath: restartLog,
++					receiptPath: join(restartDir, "last-result.json"),
++					timeouts: {
++						exitMs: 30000,
++						forceMs: 8000,
++						startMs: 25000,
++						settleMs: 2500
++					}
++				}, null, 2)}\n`, "utf8");
++			}
++			app.relaunch();
++			appendRestartLog("app.relaunch() scheduled; quitting");
++			if (configPath !== void 0) {
++				try {
++					watchdogProcess = spawn(process.execPath, [watchdogPath, configPath], {
++						detached: true,
++						stdio: "ignore",
++						windowsHide: true,
++						env: {
++							...process.env,
++							ELECTRON_RUN_AS_NODE: "1"
++						}
++					});
++					watchdogProcess.once("error", (error) => appendRestartLog(`watchdog spawn error: ${error.message}`));
++					watchdogProcess.unref();
++					appendRestartLog(`watchdog started pid=${String(watchdogProcess.pid)}`);
++				} catch (error) {
++					appendRestartLog(`watchdog could not be started: ${error instanceof Error ? error.message : String(error)}`);
++				}
++			} else appendRestartLog(`watchdog not found at ${watchdogPath}; relying on app.relaunch()`);
++			quitWithoutConfirmation();
++		} catch (error) {
++			trayRestartInFlight = false;
++			try {
++				watchdogProcess?.kill();
++			} catch {}
++			const detail = error instanceof Error ? error.stack ?? error.message : String(error);
++			appendRestartLog(`restart failed: ${detail}`);
++			dialog.showErrorBox("DeepSeek Harness", `Restart failed: ${error instanceof Error ? error.message : String(error)}\nLog: ${restartLog}`);
++		}
++	};
+ 	let startup;
+ 	let workspaceRecovery;
+ 	let mainWindow;
+@@ -20518,7 +20627,8 @@ async function main() {
+ 		const hostInspectPort = developmentHostInspectPort(development);
+ 		const host = new DesktopHostProcess(resources.node, resources.dsh, activeProject, hostInspectPort, {
+ 			...hostEnvironment,
+-			DSH_CLIENT_VERSION: desktopClientVersion()
++			DSH_CLIENT_VERSION: desktopClientVersion(),
++			DSH_DESKTOP_RESTART_IPC: "1"
+ 		}, onFailure, primaryRuntime, resources, (next) => {
+ 			platformView.setSession(next);
+ 		}, (record) => {
+@@ -20528,7 +20638,7 @@ async function main() {
+ 				queuedBytes: 64 * 1024
+ 			});
+ 			operationJournal.enqueue(JSON.stringify(record));
+-		});
++		}, () => restartFromTray());
+ 		return {
+ 			start: async () => {
+ 				const ready = await host.start();
+@@ -21385,6 +21495,9 @@ async function main() {
+ 			open: () => {
+ 				focusPrimaryWindow();
+ 			},
++			restart: () => {
++				restartFromTray();
++			},
+ 			quit: () => {
+ 				app.quit();
+ 			}
+@@ -21590,9 +21703,27 @@ async function main() {
+ 		});
+ 		return openingWelcome;
+ 	};
++	const readWelcomeStateWithRetry = async () => {
++		for (let attempt = 0; ; attempt++) {
++			try {
++				return await readWelcomeState();
++			} catch (error) {
++				const code = error?.cause?.code ?? error?.code ?? "";
++				const transient = /ECONNRESET|ECONNREFUSED|EPIPE|UND_ERR_SOCKET|fetch failed/iu.test(`${error?.message ?? error} ${code}`);
++				if (!transient || attempt >= 2 || quitting) throw error;
++				try {
++					const startupLogDir = join(app.getPath("userData"), "tray-restart");
++					mkdirSync(startupLogDir, { recursive: true });
++					appendFileSync(join(startupLogDir, "startup.log"), `${new Date().toISOString()} welcome-state read failed (attempt ${attempt + 1}): ${error?.message ?? error} ${code}; retrying\n`);
++				} catch {}
++				console.warn("desktop welcome: transient startup read failure; retrying", error);
++				await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
++			}
++		}
++	};
+ 	const openInitialWindow = async () => {
+ 		if (quitting || recovery.active) return;
+-		const state = await readWelcomeState();
++		const state = await readWelcomeStateWithRetry();
+ 		if (isQuitting() || backend.state.phase !== "ready") return;
+ 		nativeTheme.themeSource = state.themePreference;
+ 		locale = resolveDesktopStartupLocale(state.localePreference, systemLanguages);

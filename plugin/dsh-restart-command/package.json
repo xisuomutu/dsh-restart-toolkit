@@ -1,0 +1,24 @@
+{
+  "name": "@local/dsh-restart-command",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Restart DeepSeek Harness from the Web command surface through the desktop shell restart bridge.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

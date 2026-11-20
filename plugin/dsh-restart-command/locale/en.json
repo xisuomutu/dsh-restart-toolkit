@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Restart DeepSeek Harness (command)",
+    "description": "Registers /restart-dsh. It shares the desktop tray patch's restart bridge: DeepSeek Harness exits completely and starts again with the same executable and argv. Without the patch the command returns a clear error.",
+    "detail": "docs/DETAIL.md"
+  }
+}
